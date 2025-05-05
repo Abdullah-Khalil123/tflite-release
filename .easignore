@@ -1,0 +1,44 @@
+# Node modules
+
+node_modules/
+
+# Git
+
+.git/
+.gitignore
+
+# macOS files
+
+.DS_Store
+
+# Logs
+
+\*.log
+
+# Expo specific
+
+.expo/
+.expo-shared/
+
+/android
+/ios
+
+# Android build
+
+android/app/build/
+android/.gradle/
+android/.idea/
+android/local.properties
+
+# iOS build
+
+ios/build/
+ios/Pods/
+ios/Podfile.lock
+ios/_.xcworkspace
+ios/_.xcodeproj
+
+# Environment files
+
+.env
+.env.\*
