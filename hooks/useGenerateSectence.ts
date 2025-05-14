@@ -9,7 +9,7 @@ const useGenerateSentence = (words: string[]) => {
     setSentence('');
   };
   const convertWordsToSentence = async () => {
-    const prompt = `Rearrange the following words into a grammatically correct English sentence. Only return the rearranged sentence without any additional text or explanations:
+    const prompt = `Rearrange the following words into a grammatically correct English sentence.Do Not Add Context that is not available. Only return the rearranged sentence without any additional text or explanations:
 ${words.join(' ')}`;
 
     setLoading(true);

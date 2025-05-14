@@ -28,8 +28,12 @@ import { DetectionResult, SavedGesture } from '../../types/types';
 import { modelToString } from '../../utils/utils';
 
 export default function App(): React.ReactNode {
+  const [cameraPosition, setCameraPosition] = React.useState<'front' | 'back'>(
+    'back'
+  );
+
   const { hasPermission, requestPermission } = useCameraPermission();
-  const device = useCameraDevice('back');
+  const device = useCameraDevice(cameraPosition);
   const [newDetections, setNewDetections] = React.useState<DetectionResult[]>(
     []
   );
@@ -66,6 +70,10 @@ export default function App(): React.ReactNode {
     clearSentence,
     convertWordsToSentence,
   } = useGenerateSentence(gestureWords);
+
+  const detectionHistory = React.useRef<
+    Array<{ gesture: string | null; timestamp: number }>
+  >([]);
 
   const GESTURE_RECOGNITION_THRESHOLD = 3000; // 3 seconds to confirm a gesture
   const frameTimestampRef = React.useRef<number>(0);
@@ -107,51 +115,145 @@ export default function App(): React.ReactNode {
     }
   }, [startDetection]);
 
-  // Handle gesture tracking over time
   React.useEffect(() => {
-    if (!topDetection || !startDetection) {
+    if (!startDetection) {
       setCurrentGestureStartTime(null);
       setCurrentGestureName(null);
+      detectionHistory.current = []; // Clear history when stopping detection
       return;
     }
 
     const currentTime = Date.now();
 
-    // If this is a new gesture or different from the last one
-    if (currentGestureName !== topDetection.name) {
-      setCurrentGestureStartTime(currentTime);
-      setCurrentGestureName(topDetection.name);
-      return;
+    // Update detection history
+    if (!topDetection) {
+      detectionHistory.current.push({ gesture: null, timestamp: currentTime });
+    } else {
+      detectionHistory.current.push({
+        gesture: topDetection.name,
+        timestamp: currentTime,
+      });
     }
 
-    // If we've been showing the same gesture for the threshold duration
-    if (
-      currentGestureStartTime &&
-      currentTime - currentGestureStartTime >= GESTURE_RECOGNITION_THRESHOLD
-    ) {
-      // Add gesture to saved array if it's not the same as the last added one
-      const lastGesture = savedGestures[savedGestures.length - 1];
-      if (!lastGesture || lastGesture.name !== topDetection.name) {
-        setSavedGestures((prev) => [
-          ...prev,
-          {
-            name: topDetection.name,
-            color: topDetection.color,
-            timestamp: currentTime,
-          },
-        ]);
+    // Keep history at fixed size (last 10 detections)
+    const HISTORY_SIZE = 10;
+    if (detectionHistory.current.length > HISTORY_SIZE) {
+      detectionHistory.current.shift();
+    }
+
+    // Count occurrences of each gesture in recent history
+    const gestureCounts: Record<string, number> = {};
+    detectionHistory.current.forEach((item) => {
+      if (item.gesture) {
+        gestureCounts[item.gesture] = (gestureCounts[item.gesture] || 0) + 1;
+      }
+    });
+
+    // Find the dominant gesture
+    let dominantGesture: string | null = null;
+    let maxCount = 0;
+
+    Object.entries(gestureCounts).forEach(([gesture, count]) => {
+      if (count > maxCount) {
+        maxCount = count;
+        dominantGesture = gesture;
+      }
+    });
+
+    // Check if dominant gesture is consistent enough (70% of frames)
+    const REQUIRED_CONSISTENCY = 0.7;
+    const consistency = maxCount / detectionHistory.current.length;
+
+    if (consistency >= REQUIRED_CONSISTENCY && dominantGesture) {
+      // If this is a new dominant gesture, start tracking it
+      if (currentGestureName !== dominantGesture) {
+        setCurrentGestureStartTime(currentTime);
+        setCurrentGestureName(dominantGesture);
       }
 
-      // Reset the timer to avoid continuous additions
-      setCurrentGestureStartTime(currentTime);
+      // Check if we've been showing the same gesture for the threshold duration
+      if (
+        currentGestureStartTime &&
+        currentTime - currentGestureStartTime >= GESTURE_RECOGNITION_THRESHOLD
+      ) {
+        // Add gesture to saved array if it's not the same as the last added one
+        const lastGesture = savedGestures[savedGestures.length - 1];
+        if (!lastGesture || lastGesture.name !== dominantGesture) {
+          // Find the color for this gesture from topDetection
+          const gestureColor = topDetection ? topDetection.color : '#cccccc'; // Fallback color
+
+          setSavedGestures((prev) => [
+            ...prev,
+            {
+              name: dominantGesture as string,
+              color: gestureColor,
+              timestamp: currentTime,
+            },
+          ]);
+        }
+
+        // Reset the timer to avoid continuous additions
+        setCurrentGestureStartTime(currentTime);
+      }
+    } else if (consistency < 0.3) {
+      // If consistency is very low, reset tracking
+      setCurrentGestureStartTime(null);
+      setCurrentGestureName(null);
     }
+    // Otherwise keep the current tracking gesture (hysteresis)
   }, [
     topDetection,
+    startDetection,
+    savedGestures,
     currentGestureStartTime,
     currentGestureName,
-    savedGestures,
-    startDetection,
   ]);
+
+  // Handle gesture tracking over time
+  // React.useEffect(() => {
+  //   if (!topDetection || !startDetection) {
+  //     setCurrentGestureStartTime(null);
+  //     setCurrentGestureName(null);
+  //     return;
+  //   }
+
+  //   const currentTime = Date.now();
+
+  //   // If this is a new gesture or different from the last one
+  //   if (currentGestureName !== topDetection.name) {
+  //     setCurrentGestureStartTime(currentTime);
+  //     setCurrentGestureName(topDetection.name);
+  //     return;
+  //   }
+
+  //   // If we've been showing the same gesture for the threshold duration
+  //   if (
+  //     currentGestureStartTime &&
+  //     currentTime - currentGestureStartTime >= GESTURE_RECOGNITION_THRESHOLD
+  //   ) {
+  //     // Add gesture to saved array if it's not the same as the last added one
+  //     const lastGesture = savedGestures[savedGestures.length - 1];
+  //     if (!lastGesture || lastGesture.name !== topDetection.name) {
+  //       setSavedGestures((prev) => [
+  //         ...prev,
+  //         {
+  //           name: topDetection.name,
+  //           color: topDetection.color,
+  //           timestamp: currentTime,
+  //         },
+  //       ]);
+  //     }
+
+  //     // Reset the timer to avoid continuous additions
+  //     setCurrentGestureStartTime(currentTime);
+  //   }
+  // }, [
+  //   topDetection,
+  //   currentGestureStartTime,
+  //   currentGestureName,
+  //   savedGestures,
+  //   startDetection,
+  // ]);
 
   // Function to remove the last saved gesture
   const removeLastGesture = () => {
@@ -268,8 +370,32 @@ export default function App(): React.ReactNode {
           }
         }
 
-        // Sort by confidence score (highest first)
+        // // Sort by confidence score (highest first)
+        // detectionResults.sort((a, b) => b.score - a.score);
+        // detectionResults = detectionResults.slice(0, KEEP_DETECTIONS);
+
+        // // Update state with frame timestamp to ensure synchronization
+        // setDetectionState(detectionResults, frameTimestamp);
+
         detectionResults.sort((a, b) => b.score - a.score);
+
+        // Check if we need to prioritize "call" over "like"
+        const callIndex = detectionResults.findIndex(
+          (detection) => labelMap[detection.classId].name === 'call'
+        );
+        const likeIndex = detectionResults.findIndex(
+          (detection) => labelMap[detection.classId].name === 'like'
+        );
+
+        // If both call and like are detected and like has higher score (appears first)
+        if (callIndex > -1 && likeIndex > -1 && likeIndex < callIndex) {
+          // Swap them to prioritize call
+          const callDetection = detectionResults[callIndex];
+          detectionResults[callIndex] = detectionResults[likeIndex];
+          detectionResults[likeIndex] = callDetection;
+        }
+
+        // Limit the number of results after prioritization
         detectionResults = detectionResults.slice(0, KEEP_DETECTIONS);
 
         // Update state with frame timestamp to ensure synchronization
@@ -313,7 +439,7 @@ export default function App(): React.ReactNode {
             pixelFormat="rgb"
           />
           {/* Overlay for bounding boxes */}
-          <View style={StyleSheet.absoluteFill} pointerEvents="none">
+          {/* <View style={StyleSheet.absoluteFill} pointerEvents="none">
             {startDetection &&
               newDetections.map((detection, index) => {
                 // Convert normalized coordinates to screen coordinates
@@ -362,7 +488,7 @@ export default function App(): React.ReactNode {
                   </View>
                 );
               })}
-          </View>
+          </View> */}
 
           {/* Status indicator */}
           <View style={styles.statusContainer}>
@@ -466,6 +592,17 @@ export default function App(): React.ReactNode {
               <Text style={styles.buttonText}>
                 {startDetection ? 'Stop Detection' : 'Start Detection'}
               </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.detectionButton}
+              onPress={() =>
+                setCameraPosition((prev) =>
+                  prev === 'back' ? 'front' : 'back'
+                )
+              }
+            >
+              <Text style={styles.buttonText}>Flip Camera</Text>
             </TouchableOpacity>
 
             {/* Top detection display */}

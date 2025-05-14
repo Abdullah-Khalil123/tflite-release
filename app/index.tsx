@@ -23,7 +23,7 @@ export default function App() {
 
   const handleLogin = async () => {
     const response = await fetch(
-      'https://levi-backend-gold.vercel.app/api/users/login',
+      'https://signify-backend-gjut.onrender.com/api/auth/login',
       {
         method: 'POST',
         headers: {
@@ -89,6 +89,18 @@ export default function App() {
           <Text className="text-xs leading-[18px] font-poppins500 my-6 text-center">
             Or
           </Text>
+
+          <ResizingButton
+            title="Sign Up"
+            onPress={() => {
+              router.replace('../signup/signup');
+            }}
+            className="bg-[#FFF6F5] py-4 border border-[#F46A62] mb-3"
+            textStyles="text-base text-black"
+            isLoading={false}
+            isDisabled={false}
+          />
+
           <ResizingButton
             title="Guest Login"
             // Icon={GoogleLogoSVG}

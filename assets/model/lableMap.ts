@@ -6,7 +6,7 @@ const labelMap: { [key: number]: { name: string; color: string } } = {
   4: { name: 'like', color: '#B10DC9' },
   5: { name: 'mute', color: '#FF851B' },
   6: { name: 'ok', color: '#39CCCC' },
-  7: { name: 'one', color: '#F012BE' },
+  7: { name: 'I', color: '#F012BE' },
   8: { name: 'palm', color: '#2ECC40' },
   9: { name: 'peace', color: '#A52A2A' },
   10: { name: 'victory', color: '#FFC0CB' }, // was peace_inverted
